@@ -1,13 +1,15 @@
 local Job = require("plenary.job")
 local M = {}
 
-M.generate = function(cfg, lang, tag_file, filepath)
+M.generate = function(cfg, lang, tag_file, options_path, filepath)
   local args = {
     "-f",
     tag_file:expand(),
   }
 
-  if not cfg.has_options then
+  if options_path then
+    table.insert(args, 1, "--options="..options_path)
+  else
     table.insert(args, 1, "--languages=" .. lang)
   end
 
