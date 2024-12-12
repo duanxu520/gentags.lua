@@ -25,8 +25,13 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
     table.insert(args, cfg.root_dir:expand())
   end
 
+  local bin = cfg.bin
+  if cfg.bin_map then
+    bin = cfg.bin_map[lang] or bin
+  end
+
   local j = Job:new({
-    command = cfg.bin,
+    command = bin,
     args = args,
     on_exit = vim.schedule_wrap(function(job, code)
       if code ~= 0 then
