@@ -114,10 +114,7 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
         vim.print(job._stderr_results)
       elseif max_duplicates and max_duplicates > 0 then
         -- Clean duplicates after successful generation
-        local removed = M.clean_duplicates(tag_file_path, max_duplicates)
-        if removed > 0 then
-          vim.print(string.format("[gentags] Removed %d duplicate tags (max: %d)", removed, max_duplicates))
-        end
+        M.clean_duplicates(tag_file_path, max_duplicates)
       end
     end),
   })
@@ -170,10 +167,7 @@ M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
         vim.print(job._stderr_results)
       elseif max_duplicates and max_duplicates > 0 then
         -- Clean duplicates after successful generation
-        local removed = M.clean_duplicates(tag_file_path, max_duplicates)
-        if removed > 0 then
-          vim.print(string.format("[gentags] Removed %d duplicate tags (max: %d)", removed, max_duplicates))
-        end
+        M.clean_duplicates(tag_file_path, max_duplicates)
       end
     end),
   })
