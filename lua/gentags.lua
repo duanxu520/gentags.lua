@@ -221,7 +221,7 @@ M.disable = function()
 end
 
 local options_flag = "--options"
-local options_flag_size = #options_flag
+local langdef_flag = "--langdef"
 
 M.setup = function(args)
   if args == nil then
@@ -233,11 +233,14 @@ M.setup = function(args)
   config.root_dir = root_path
   Path:new(config.cache.path):mkdir({ exists_ok = true })
 
+  -- Check for --options and --langdef in user args
   if args.args ~= nil then
     for _, option in ipairs(args.args) do
-      if option:sub(1, options_flag_size) == options_flag then
+      if option:sub(1, #options_flag) == options_flag then
         config.has_options = true
-        break
+      end
+      if option:sub(1, #langdef_flag) == langdef_flag then
+        config.has_langdef = true
       end
     end
   end

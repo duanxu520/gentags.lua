@@ -75,20 +75,24 @@ M.clean_duplicates = function(tag_file_path, max_duplicates)
 end
 
 M.generate = function(cfg, lang, tag_file, options_path, filepath)
-  local args = {
-    "-f",
-    tag_file:expand(),
-  }
+  local args = {}
 
-  if options_path then
-    table.insert(args, 1, "--options="..options_path)
-  else
-    table.insert(args, 1, "--languages=" .. lang)
-  end
-
+  -- Add user args first (may contain --langdef, --langmap, etc.)
   for _, v in ipairs(cfg.args) do
     table.insert(args, v)
   end
+
+  -- Add options or languages after user args (so --langdef comes first)
+  if options_path then
+    table.insert(args, "--options=" .. options_path)
+  elseif not cfg.has_langdef then
+    -- Only add --languages if user didn't define custom language
+    table.insert(args, "--languages=" .. lang)
+  end
+
+  -- Add output file
+  table.insert(args, "-f")
+  table.insert(args, tag_file:expand())
 
   if filepath then
     table.insert(args, "-a")
@@ -132,20 +136,24 @@ end
 
 -- Generate tags for a specific subdirectory
 M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
-  local args = {
-    "-f",
-    tag_file:expand(),
-  }
+  local args = {}
 
-  if options_path then
-    table.insert(args, 1, "--options="..options_path)
-  else
-    table.insert(args, 1, "--languages=" .. lang)
-  end
-
+  -- Add user args first (may contain --langdef, --langmap, etc.)
   for _, v in ipairs(cfg.args) do
     table.insert(args, v)
   end
+
+  -- Add options or languages after user args (so --langdef comes first)
+  if options_path then
+    table.insert(args, "--options=" .. options_path)
+  elseif not cfg.has_langdef then
+    -- Only add --languages if user didn't define custom language
+    table.insert(args, "--languages=" .. lang)
+  end
+
+  -- Add output file
+  table.insert(args, "-f")
+  table.insert(args, tag_file:expand())
 
   -- Use subdir_path instead of root_dir
   table.insert(args, "-R")
