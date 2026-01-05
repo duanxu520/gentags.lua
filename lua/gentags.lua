@@ -179,26 +179,12 @@ M.enable = function()
         local filepath = vim.fn.expand("%:p")
 
         if config.subdir_mode then
-          -- Find matching subdir and set corresponding tags
-          local subdir = get_subdir_for_file(filepath)
-          if subdir then
+          -- Add all configured subdirs' tags
+          for _, subdir in ipairs(config.subdirs) do
             local subdir_tag_file = get_tag_file_for_subdir(subdir, lang)
             if subdir_tag_file then
               vim.cmd("setlocal tags+=" .. subdir_tag_file:expand())
             end
-            -- Also add dependency tags
-            local deps = config.subdir_deps[subdir]
-            if deps then
-              for _, dep_subdir in ipairs(deps) do
-                local dep_tag_file = get_tag_file_for_subdir(dep_subdir, lang)
-                if dep_tag_file then
-                  vim.cmd("setlocal tags+=" .. dep_tag_file:expand())
-                end
-              end
-            end
-          else
-            -- Fallback to root tags
-            vim.cmd("setlocal tags+=" .. tag_file:expand())
           end
         else
           vim.cmd("setlocal tags+=" .. tag_file:expand())
