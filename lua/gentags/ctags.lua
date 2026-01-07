@@ -1,6 +1,82 @@
 local Job = require("plenary.job")
 local M = {}
 
+-- Check if a line is a valid tag line (not header, not corrupted)
+local function is_valid_tag_line(line)
+  -- Tag line format: tagname<TAB>filename<TAB>pattern;"<TAB>kind
+  -- Must have at least 3 tab-separated fields
+  if not line or line == "" then
+    return false
+  end
+  -- Skip header lines
+  if line:match("^!") then
+    return true
+  end
+  -- Check for basic tag format: has tabs and doesn't look like source code
+  local tab_count = 0
+  for _ in line:gmatch("\t") do
+    tab_count = tab_count + 1
+  end
+  -- Valid tag lines have at least 2 tabs (tagname, filename, pattern)
+  if tab_count < 2 then
+    return false
+  end
+  -- Check if first field (tag name) is a valid identifier
+  local tag_name = line:match("^([^\t]+)")
+  if not tag_name then
+    return false
+  end
+  -- Tag name should be a valid identifier (alphanumeric + underscore, not starting with number)
+  if not tag_name:match("^[%a_][%w_]*$") then
+    return false
+  end
+  return true
+end
+
+-- Validate and fix corrupted tags file
+-- Returns true if file is valid or was fixed, false if couldn't fix
+M.validate_tags_file = function(tag_file_path)
+  local file = io.open(tag_file_path, "r")
+  if not file then
+    return true -- File doesn't exist, will be created
+  end
+
+  local lines = {}
+  local has_invalid_lines = false
+  local has_valid_tags = false
+
+  for line in file:lines() do
+    if is_valid_tag_line(line) then
+      table.insert(lines, line)
+      if not line:match("^!") then
+        has_valid_tags = true
+      end
+    else
+      has_invalid_lines = true
+    end
+  end
+  file:close()
+
+  -- If file has invalid lines, rewrite it with only valid lines
+  if has_invalid_lines then
+    if has_valid_tags or #lines > 0 then
+      file = io.open(tag_file_path, "w")
+      if file then
+        for _, line in ipairs(lines) do
+          file:write(line .. "\n")
+        end
+        file:close()
+      end
+    else
+      -- File is completely corrupted, delete it
+      os.remove(tag_file_path)
+    end
+    return true
+  end
+
+  return true
+end
+
 -- Clean duplicate tags that exceed max_duplicates
 -- Returns the number of removed tags
 M.clean_duplicates = function(tag_file_path, max_duplicates)
@@ -75,6 +151,13 @@ M.clean_duplicates = function(tag_file_path, max_duplicates)
 end
 
 M.generate = function(cfg, lang, tag_file, options_path, filepath)
+  local tag_file_path = tag_file:expand()
+
+  -- Validate tags file before appending (to avoid appending to corrupted file)
+  if filepath then
+    M.validate_tags_file(tag_file_path)
+  end
+
   local args = {}
 
   -- Add user args first (may contain --langdef, --langmap, etc.)
@@ -92,7 +175,7 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
 
   -- Add output file
   table.insert(args, "-f")
-  table.insert(args, tag_file:expand())
+  table.insert(args, tag_file_path)
 
   if filepath then
     table.insert(args, "-a")
@@ -107,7 +190,6 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
     bin = cfg.bin_map[lang] or bin
   end
 
-  local tag_file_path = tag_file:expand()
   local max_duplicates = cfg.max_duplicates
 
   local j = Job:new({
@@ -116,9 +198,12 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
     on_exit = vim.schedule_wrap(function(job, code)
       if code ~= 0 then
         vim.print(job._stderr_results)
-      elseif max_duplicates and max_duplicates > 0 then
-        -- Clean duplicates after successful generation
-        M.clean_duplicates(tag_file_path, max_duplicates)
+      else
+        -- Validate and clean after generation
+        M.validate_tags_file(tag_file_path)
+        if max_duplicates and max_duplicates > 0 then
+          M.clean_duplicates(tag_file_path, max_duplicates)
+        end
       end
     end),
   })
@@ -127,7 +212,8 @@ M.generate = function(cfg, lang, tag_file, options_path, filepath)
     j:start()
   else
     j:sync()
-    -- For sync mode, also clean duplicates
+    -- For sync mode, also validate and clean
+    M.validate_tags_file(tag_file_path)
     if max_duplicates and max_duplicates > 0 then
       M.clean_duplicates(tag_file_path, max_duplicates)
     end
@@ -136,6 +222,8 @@ end
 
 -- Generate tags for a specific subdirectory
 M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
+  local tag_file_path = tag_file:expand()
+
   local args = {}
 
   -- Add user args first (may contain --langdef, --langmap, etc.)
@@ -153,7 +241,7 @@ M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
 
   -- Add output file
   table.insert(args, "-f")
-  table.insert(args, tag_file:expand())
+  table.insert(args, tag_file_path)
 
   -- Use subdir_path instead of root_dir
   table.insert(args, "-R")
@@ -164,7 +252,6 @@ M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
     bin = cfg.bin_map[lang] or bin
   end
 
-  local tag_file_path = tag_file:expand()
   local max_duplicates = cfg.max_duplicates
 
   local j = Job:new({
@@ -173,9 +260,12 @@ M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
     on_exit = vim.schedule_wrap(function(job, code)
       if code ~= 0 then
         vim.print(job._stderr_results)
-      elseif max_duplicates and max_duplicates > 0 then
-        -- Clean duplicates after successful generation
-        M.clean_duplicates(tag_file_path, max_duplicates)
+      else
+        -- Validate and clean after generation
+        M.validate_tags_file(tag_file_path)
+        if max_duplicates and max_duplicates > 0 then
+          M.clean_duplicates(tag_file_path, max_duplicates)
+        end
       end
     end),
   })
@@ -184,7 +274,8 @@ M.generate_for_subdir = function(cfg, lang, tag_file, options_path, subdir_path)
     j:start()
   else
     j:sync()
-    -- For sync mode, also clean duplicates
+    -- For sync mode, also validate and clean
+    M.validate_tags_file(tag_file_path)
     if max_duplicates and max_duplicates > 0 then
       M.clean_duplicates(tag_file_path, max_duplicates)
     end
